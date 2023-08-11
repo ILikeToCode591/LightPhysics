@@ -1,6 +1,8 @@
 import pygame
 import pygame as pg
 
+import GlobalVariables
+
 
 class NineSliced:
     widthError = ValueError('width is too low')
@@ -17,8 +19,8 @@ class NineSliced:
 
     def createParts(self):
 
-        horizontals = (0, self.centre[0], self.centre[2], self.baseImage.get_width())
-        verticals = (0, self.centre[1], self.centre[3], self.baseImage.get_height())
+        horizontals = (0, self.left, self.centre[2], self.baseImage.get_width())
+        verticals = (0, self.top, self.centre[3], self.baseImage.get_height())
         self.parts.clear()
 
         for v in range(len(verticals) - 1):
@@ -41,17 +43,19 @@ class NineSliced:
         horizontalResize = width - (self.left + self.right) * scale
         verticalResize = height - (self.top + self.bottom) * scale
 
-        horizontals = (0, self.left * scale, width - self.right * scale)
-        verticals = (0, self.right * scale, height - self.bottom * scale)
+        horizontals = (0, self.left * scale, width - self.right * scale, width)
+        verticals = (0, self.top * scale, height - self.bottom * scale, height)
 
         image = pg.surface.Surface((width, height), pg.SRCALPHA)
         part = 0
 
-        for v in range(len(verticals)):
-            for h in range(len(horizontals)):
+        for v in range(len(verticals) - 1):
+            for h in range(len(horizontals) - 1):
                 image.blit(pg.transform.scale(self.parts[part], (
-                    horizontalResize if h % 2 else self.parts[part].get_width() * scale,
-                    verticalResize if v % 2 else self.parts[part].get_height() * scale)), (horizontals[h], verticals[v]))
+                    horizontalResize if h % 2 else (self.parts[part].get_width()) * scale,
+                    verticalResize if v % 2 else (self.parts[part].get_height()) * scale)
+                                              ), (horizontals[h], verticals[v], horizontals[h + 1], verticals[v + 1])
+                           )
                 part += 1
 
         return image
@@ -60,7 +64,6 @@ class NineSliced:
 class Text:
 
     def __init__(self, text, color, position, size):
-
         self.font = pg.font.Font('assets/fonts/game_over.ttf', size)
         self.text = text
         self.color = color
@@ -85,11 +88,11 @@ class Text:
 class TextInput:
     allInstances = []
 
-    def __init__(self, position, plate, selectedPlate, width, height, title, scale = 1):
+    def __init__(self, position, plate, selectedPlate, width, height, title, scale=1):
 
         self.nineSliced = plate
         self.selectedSliced = selectedPlate
-        self.name = Text(title, (200, 200, 200), position, 32*scale)
+        self.name = Text(title, (200, 200, 200), position, 32 * scale)
         self.position = position
 
         self.plate = plate.createImage(width, height)
@@ -97,9 +100,9 @@ class TextInput:
         self.plateRect = self.plate.get_rect()
         self.selectedPlateRect = self.selectedPlate.get_rect()
 
-        self.plate = pg.transform.scale(self.plate, (self.plateRect.width/2, self.plateRect.height/2))
+        self.plate = pg.transform.scale(self.plate, (self.plateRect.width / 2, self.plateRect.height / 2))
         self.selectedPlate = pg.transform.scale(self.selectedPlate,
-                                                (self.selectedPlateRect.width/2, self.selectedPlateRect.height/2))
+                                                (self.selectedPlateRect.width / 2, self.selectedPlateRect.height / 2))
         self.plateRect = self.plate.get_rect()
         self.selectedPlateRect = self.selectedPlate.get_rect()
 
@@ -142,7 +145,6 @@ class TextInput:
 
 
 class Button:
-
     allInstances = []
 
     def __init__(self, position, size, plateActive, plateInactive, icon, function):
@@ -204,10 +206,54 @@ class Button:
                 return button
         return None
 
+
 class KeyBind:
-    def __init__(self):
-        pass
+    allInstances = dict()
 
+    def __init__(self, key, name, size, pos):
+        self.key = key
+        self.name = pg.font.Font(None, 32).render(name, True, (255, 255, 255))
 
+        self.keyPressed = GlobalVariables.keyboardPressed.createImage(*size, 1.5)
+        self.keyUnpressed = GlobalVariables.keyboardUnpressed.createImage(*size, 1.5)
 
+        self.image = pg.surface.Surface(size, pg.SRCALPHA)
+        self.rect = self.image.get_rect()
+        self.pressed = True
 
+        self.hidden = False
+
+        self.rect.center = pos
+        self.updateKey(False)
+
+        self.allInstances[self.key] = self
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+    def updateKey(self, pressed):
+
+        if pressed == self.pressed: return
+
+        self.image.fill((0, 0, 0, 0))
+        self.pressed = pressed
+
+        self.image.blit(self.keyPressed if pressed else self.keyUnpressed, (0, 0))
+        self.image.blit(self.name, (
+        self.rect.width // 2 - self.name.get_width() // 2, self.rect.height//2 - self.name.get_height() // 2 - 5 + (5 if pressed else 0)))
+
+    def kill(self):
+        KeyBind.allInstances.pop(self.key)
+        del self
+
+    @staticmethod
+    def drawInstances(screen):
+        for keybind in KeyBind.allInstances.values():
+            if not keybind.hidden:
+                keybind.draw(screen)
+
+    @staticmethod
+    def updateInteraction(key, pressed):
+
+        if key in KeyBind.allInstances:
+            KeyBind.allInstances[key].updateKey(pressed)

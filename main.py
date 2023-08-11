@@ -1,12 +1,10 @@
+import GlobalVariables
 from GlobalVariables import *
 import GlobalVariables as gVars
 from Mirror import Mirror
 from Pointer import Pointer
 from Particles import ParticleGenerator
 from SaveAndLoad import SaveAndLoad
-
-# initializing pygame
-pg.init()
 
 SCREEN = pg.display.set_mode((winWidth, winHeight), pg.SRCALPHA)
 
@@ -37,6 +35,7 @@ while not gameEnd:
             selectedButton = Button.checkInteraction()
 
             if selectedObject:
+
                 for opt in selectedObject.options:
                     if opt[0].plateRect.collidepoint(*pg.mouse.get_pos()):
                         if selectedInput is not None:
@@ -58,10 +57,16 @@ while not gameEnd:
                 for cl in objects:
                     selectedObject = cl.checkCollision(pg.Vector2(pg.mouse.get_pos()))[1]
                     if selectedObject:
+                        for k in GlobalVariables.BUILDTOOLS:
+                            k.hidden = False
+
                         for opt in selectedObject.options:
                             opt[0].changeText(opt[1]())
                         break
                 else:
+                    for k in GlobalVariables.BUILDTOOLS:
+                        k.hidden = True
+
                     selectedObject = None
                     transforming = False
 
@@ -81,7 +86,14 @@ while not gameEnd:
 
         if event.type == pg.KEYDOWN:
 
+            KeyBind.updateInteraction(event.key, True)
             pressedKeys.append(event.key)
+
+            if event.key == pg.K_d and selectedObject:
+                if isinstance(selectedObject, Mirror):
+                    selectedObject = Mirror(selectedObject.body.position, selectedObject.body.rotation, selectedObject.body.length)
+                elif isinstance(selectedObject, Pointer):
+                    selectedObject = Pointer(selectedObject.body.position, selectedObject.body.rotation, selectedObject.body.width, selectedObject.color)
 
             if pg.K_s == event.key and pg.key.get_mods() & pg.KMOD_CTRL:
                 SaveAndLoad.save(gVars.currentSave)
@@ -104,6 +116,10 @@ while not gameEnd:
                         cl.resetInstances()
 
                 if gVars.MODE != 'build':
+
+                    for k in GlobalVariables.BUILDTOOLS:
+                        k.hidden = True
+
                     for obj in objects:
                         obj.objectButton.hidden = True
 
@@ -113,6 +129,11 @@ while not gameEnd:
                             selectedInput.input.updateText('', (0, 0, 0))
                             selectedInput = None
                 else:
+
+                    if selectedObject:
+                        for k in GlobalVariables.BUILDTOOLS:
+                            k.hidden = False
+
                     if len(SaveAndLoad.availableSaves):
                         for button, delet in SaveAndLoad.availableSaves:
                             button.kill()
@@ -125,6 +146,7 @@ while not gameEnd:
                 gVars.lightingButton.hidden = False if gVars.MODE == 'simulate' else True
 
         if event.type == pg.KEYUP:
+            KeyBind.updateInteraction(event.key, False)
             pressedKeys.remove(event.key)
 
         # checking for game quit
@@ -191,6 +213,10 @@ while not gameEnd:
             SaveAndLoad.loadSaves()
 
         Button.drawInstances(SCREEN)
+
+    GlobalVariables.enterKeyBind.hidden = True if gVars.MODE != 'newSave' else False
+
+    KeyBind.drawInstances(SCREEN)
 
     pg.display.flip()
 
