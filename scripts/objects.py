@@ -10,7 +10,7 @@ class Attachable:
         self.attached_objs = []  # list[list[Attachable, displacement_vector]]
 
     def rotate(self, angle):
-        self.rotation -= angle
+        self.rotation += angle
         self.rotation %= 360
         for obj in self.attached_objs:
             obj[1] = obj[1].rotate(angle)
@@ -145,7 +145,7 @@ class Laser(Attachable):
 
     def rotate_subclass(self, angle):
         self.reset()
-        self.direction = self.direction.rotate(-angle)
+        self.direction = self.direction.rotate(angle)
 
     def displace_subclass(self, offset):
         self.reset()
@@ -283,17 +283,14 @@ class PolyMirror(Interactable):
 
         self.custom_frame = Frame(win_width, win_height, pg.Vector2(0, 0))
         self.selected_vertex = None
-
-        for v in self.polygon.vertex_offsets:
-            buttn = ImageButton(self.polygon.position + v, 10, 10,
-                                None, self.deselect_vertex,
-                                image='corner.png')
-            buttn.onclick = lambda ver = v, b = buttn: self.select_vertex(ver, b)
-            buttn.triggers[pg.MOUSEMOTION].append(('n', self.move_vertex))
-
-            self.custom_frame.add_widget(buttn)
+        self.vertices = {}
 
         self.custom_frame.add_widget(Image(pg.Vector2(self.position), 15, 15, 'cursor.png'))
+
+        for i in range(len(self.polygon.vertex_offsets)):
+            self.create_vertex_button(i)
+        self.custom_frame.registered_events.add(pg.MOUSEBUTTONDOWN)
+        self.custom_frame.event_handler.register(pg.MOUSEBUTTONDOWN, self.add_vertex)
 
     def render(self, screen: pg.Surface, light_scrn, simulate=False):
         self.polygon.render(screen)
@@ -301,51 +298,83 @@ class PolyMirror(Interactable):
     def shader(self, shader_scrn):
         pass
 
+    def align_buttons(self):
+        for k in self.vertices:
+            self.vertices[k].position =  self.position + self.polygon.get_vertex_by_reference(k)
+            self.vertices[k].rect.center = self.vertices[k].position
+
     def increase_size(self):
         self.polygon.increase_size()
+        self.align_buttons()
         self.reset_rays()
 
     def decrease_size(self):
         self.polygon.decrease_size()
+        self.align_buttons()
         self.reset_rays()
 
     def rotate_subclass(self, angle):
+        self.align_buttons()
         self.reset_rays()
-        for w in self.custom_frame.widgets:
-            newpos = self.position + (w.position-self.position).rotate(angle)
-            w.position = w.rect.center = newpos
 
     def displace_subclass(self, offset):
-        self.reset_rays()
         for w in self.custom_frame.widgets:
             w.position += offset
             w.rect.center = w.position
+        self.reset_rays()
 
     def check_selection(self, pos):
         return self.polygon.collide_point(pos)
 
-    def select_vertex(self, v, b):
-        self.selected_vertex = [v, b]
+    def select_vertex(self, key):
+        self.selected_vertex = key
 
     def move_vertex(self, *args):
         if self.selected_vertex:
             pos = pg.Vector2(pg.mouse.get_pos())
-            self.selected_vertex[0] -= self.selected_vertex[0]
-            self.selected_vertex[0] += pos - self.polygon.position
-            self.selected_vertex[1].position = self.selected_vertex[1].rect.center = pos
-            self.polygon.update_polygon()
+            v=self.polygon.get_vertex_by_reference(self.selected_vertex)
+            v-=v
+            v += pos - self.position
+            self.vertices[self.selected_vertex].position = pos
+            self.vertices[self.selected_vertex].rect.center = pos
+
+    def delete_vertex(self, *args):
+        if self.selected_vertex:
+            if not self.polygon.delete_vertex(self.selected_vertex):
+                return
+            self.custom_frame.widgets.remove(self.vertices[self.selected_vertex])
+            del self.vertices[self.selected_vertex]
+            self.deselect_vertex()
+
+    def create_vertex_button(self, i):
+        key = self.polygon.refer_vertex(i)
+        v = self.polygon.vertex_offsets[i]
+        buttn = ImageButton(self.polygon.position + v, 10, 10,
+                            lambda k=key: self.select_vertex(k), self.deselect_vertex,
+                            image='corner.png')
+        buttn.triggers[pg.MOUSEMOTION].append(('n', self.move_vertex))
+        buttn.triggers[pg.K_d].append(('k', self.delete_vertex, None, False))
+
+        self.vertices[key] = buttn
+        self.custom_frame.add_widget(buttn)
+
+    def add_vertex(self, event):
+        if not self.selected_vertex:
+            if event.button == pg.BUTTON_RIGHT:
+                pos = pg.Vector2(pg.mouse.get_pos())
+
+                self.create_vertex_button(self.polygon.add_vertex(pos))
 
     def deselect_vertex(self):
         self.selected_vertex = None
+        self.polygon.update_polygon()
+        self.reset_rays()
 
-    def create_mask(self):
-        poly = self.polygon.copy()
-        poly.increase_size(5)
-        mask = pg.mask.from_surface(poly.image).to_surface()
-        mask.set_colorkey(pg.Color(0, 0, 0))
-        rect = mask.get_rect()
-        rect.center = self.position
-        return mask, rect
+    def render_mask(self, surf):
+        l = self.polygon.vertex_offsets
+        for i in range(len(self.polygon.vertex_offsets)):
+            v, w = l[i], l[(i + 1) % (len(l))]
+            pg.draw.line(surf, white, self.position + v, self.position + w, poly_borderwidth+10)
 
     @staticmethod
     def create_object():
@@ -395,21 +424,16 @@ class PlaneMirror(Interactable):
     def check_selection(self, pos):
         return self.line.collide_point(pos.x, pos.y)
 
-    def create_mask(self):
-        size = (self.line.start_pos - self.line.end_pos)
-        surf = pg.Surface((abs(size.x) + 10, abs(size.y) + 10), flags=pg.SRCALPHA)
-        mid = pg.Vector2(surf.get_size())/2
+    def render_mask(self, surf):
+        mid = self.position
+        s , e = (self.line.start_pos - self.line.position), (self.line.end_pos - self.line.position)
 
         pg.draw.line(
             surf,
             pg.Color(255, 255, 255),
-            mid + (self.line.start_pos - self.line.position)*1.2, mid + (self.line.end_pos - self.line.position)*1.2,
+            mid + s + s.normalize()*5,
+            mid + e + e.normalize()*5,
             mirror_width + 10)
-
-        rect = surf.get_rect()
-        rect.center = self.position
-
-        return surf, rect
 
     @staticmethod
     def create_object():
@@ -441,6 +465,9 @@ class Pointer(Instrument):
         self.polygon.render(screen)
         self.laser_grp.render(screen, light_scrn, simulate)
 
+        if simulate:
+            self.raycast()
+
     def shader(self, shader_scrn, flags=0):
         self.laser_grp.shader(shader_scrn, flags)
 
@@ -465,15 +492,15 @@ class Pointer(Instrument):
     def check_selection(self, pos):
         return self.polygon.collide_point(pos)
 
-    def create_mask(self):
-        poly = self.polygon.copy()
-        poly.increase_size(5)
-        mask = pg.mask.from_surface(poly.image).to_surface()
-        mask.set_colorkey(pg.Color(0, 0, 0))
-        rect = mask.get_rect()
-        rect.center = self.position
-        return mask, rect
+    def render_mask(self, surf):
+        l = self.polygon.vertex_offsets
+        for i in range(len(self.polygon.vertex_offsets)):
+            v, w = l[i], l[(i + 1) % (len(l))]
+            pg.draw.line(surf, white, self.position + v, self.position + w, poly_borderwidth + 5)
 
     @staticmethod
     def create_object():
         return Pointer(pg.Vector2(win_width // 2, win_height // 2), 0, pg.Color(255, 0, 0), 1)
+
+
+Objects = Interactable | Instrument

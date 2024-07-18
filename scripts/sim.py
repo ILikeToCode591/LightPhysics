@@ -13,7 +13,8 @@ class Simulation:
 
         self.screens = {
             'test': Test(self),
-            'build': Build(self)
+            'build': Build(self),
+            'simulation': Simulate(self)
         }
 
         self.__active_screen = 'build'
@@ -45,6 +46,12 @@ class Simulation:
     @property
     def active_screen(self) -> Screen:
         return self.screens[self.__active_screen]
+
+    def set_active_screen(self, name, start = False):
+        self.__active_screen = name
+
+        if start:
+            self.active_screen.start()
 
     def __getitem__(self, item):
         return self.screens[item]

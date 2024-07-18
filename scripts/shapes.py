@@ -78,6 +78,8 @@ class Polygon(pg.sprite.Sprite):
         self.edges: list[Line] = []
         self.children = []
 
+        self.vertex_references = {}
+
         self.is_anchored = False
 
         self.image = pg.Surface((10, 10))
@@ -93,9 +95,9 @@ class Polygon(pg.sprite.Sprite):
     def update_polygon(self):
         if not len(self.vertex_offsets): return
 
-        self.vertex_offsets.sort(
-            key=lambda v: get_vector_angle(v)
-        )
+        # self.vertex_offsets.sort(
+        #     key=lambda v: get_vector_angle(v)
+        # )
 
         self.image = pg.Surface(
             (2 * abs(max(self.vertex_offsets, key=lambda o: abs(o.x)).x) + 2*poly_borderwidth,
@@ -162,12 +164,21 @@ class Polygon(pg.sprite.Sprite):
         self.update_polygon()
 
     def decrease_size(self, ds = 1):
-        if min(self.vertex_offsets, key = lambda v: v.magnitude()).magnitude() - ds < 4:
-            return
+        if min(self.vertex_offsets, key = lambda v: v.magnitude()).magnitude() - ds < 10:
+            return False
         for o in self.vertex_offsets:
-            o -= o.normalize()*ds
+            wid = self.image.get_width()
+            hei = self.image.get_height()
+
+            nx = (o.x * (wid - 2 * ds)) / wid
+            ny = (o.y * (hei - 2 * ds)) / hei
+
+            o -= o
+            o += pg.Vector2((nx, ny))
 
         self.update_polygon()
+
+        return True
 
     def render(self, screen: pg.Surface, flags=0):
 
@@ -178,7 +189,7 @@ class Polygon(pg.sprite.Sprite):
         return bool(self.rect.collidepoint(point) and self.mask.get_at(point - self.rect.topleft))
 
     def closest_line(self, p):
-        return min(self.edges, key=lambda l: l.distance_to(p))
+        return min(self.edges, key=lambda l: l.distance_to(p-self.position))
 
     def line_collide(self, sp, ep):
         if not self.rect.collidepoint(ep):
@@ -190,11 +201,50 @@ class Polygon(pg.sprite.Sprite):
         else:
             return False
 
-    def add_vertex(self, position):
-        offset = position-self.position
-        self.vertex_offsets.append(offset)
+    def add_vertex(self, pos):
+        i, dist = -1, -1
+        for index in range(len(self.vertex_offsets)):
+            mid = (self.vertex_offsets[index] + self.vertex_offsets[(index + 1) % (len(self.vertex_offsets))])/2
+            d = (pos-self.position - mid).magnitude()
+            if d < dist or dist < 0:
+                dist = d
+                i = index
+
+        offset = (self.vertex_offsets[i] + self.vertex_offsets[(i + 1) % (len(self.vertex_offsets))]) / 2
+
+        for k in self.vertex_references:
+            if self.vertex_references[k] > i:
+                self.vertex_references[k] += 1
+
+        self.vertex_offsets.insert(i + 1, offset)
+        self.update_polygon()
+
+        return i+1
+
+    def refer_vertex(self, index):
+        key = str(random()*10**8)[:8]
+        self.vertex_references[key] = index
+
+        return key
+
+    def get_vertex_by_reference(self, key):
+        return self.vertex_offsets[self.vertex_references.get(key, None)]
+
+    def delete_vertex(self, key):
+
+        if len(self.vertex_offsets) == 3:
+            return False
+
+        i = self.vertex_references[key]
+        self.vertex_offsets.pop(i)
+        del self.vertex_references[key]
+        for k in self.vertex_references:
+            if self.vertex_references[k] > i:
+                self.vertex_references[k] -= 1
 
         self.update_polygon()
+
+        return True
 
     def copy(self):
         return Polygon(

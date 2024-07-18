@@ -1,6 +1,6 @@
 from config import *
 from scripts.gui import *
-from scripts.objects import Interactable, Instrument
+from scripts.objects import Objects
 
 
 class ObjectHandler:
@@ -24,7 +24,7 @@ class ObjectHandler:
 
         self.widgets : list[Widget] = []
 
-    def register_class(self, cl : Interactable | Instrument):
+    def register_class(self, cl: Objects):
         n = len(self.registered_classes)
         self.widgets.append(Button(pg.Vector2(
             widget_button_padding*(n+1) + widget_button_width*(n+0.5),

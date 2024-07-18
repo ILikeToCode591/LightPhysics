@@ -60,6 +60,8 @@ class EventHandler:
                 f_grp[0](event)
 
         if event.type == pg.KEYUP:
+            if event.key not in self.pressed_keys:
+                return
             self.pressed_keys.remove(event.key)
             for f_grp in self.s_key_events.get(event.key, []):
                 if f_grp[1]:

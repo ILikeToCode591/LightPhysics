@@ -61,25 +61,16 @@ class Button(Widget):
 
         super().__init__(position)
 
+        self.width = width
+        self.height = height
+
         self.clicked = False
         self.onclick = onclick
         self.onrelease = onrelease
 
         self.mouse_button = mouse_button
 
-        self.image = NineSliced(*button_img).create_image(width, height)
-        self.rect = self.image.get_rect()
-
-        if name:
-            Text(name, black, pg.Vector2(width, height) / 2, 30).render(self.image)
-        if icon:
-            img = pg.image.load(get_asset(('texture', 'icon'), *tuple(icon.split('.'))))
-            rect = img.get_rect()
-
-            rect.center = pg.Vector2(width, height) / 2
-            self.image.blit(img, rect)
-
-        self.rect.center = position
+        self.set_image(name, icon)
 
         self.triggers[pg.MOUSEBUTTONDOWN].append(('n', self.click))
         self.triggers[pg.MOUSEBUTTONUP].append(('n', self.release))
@@ -87,7 +78,23 @@ class Button(Widget):
     def click(self, event):
         if event.button == self.mouse_button and self.rect.collidepoint(*pg.mouse.get_pos()):
             self.clicked = True
-            self.onclick()
+            if self.onclick:
+                self.onclick()
+
+    def set_image(self, name= None, icon = None):
+        self.image = NineSliced(*button_img).create_image(self.width, self.height)
+        self.rect = self.image.get_rect()
+
+        if name:
+            Text(name, black, pg.Vector2(self.width, self.height) / 2, 30).render(self.image)
+        if icon:
+            img = pg.image.load(get_asset(('texture', 'icon'), *tuple(icon.split('.'))))
+            rect = img.get_rect()
+
+            rect.center = pg.Vector2(self.width, self.height) / 2
+            self.image.blit(img, rect)
+
+        self.rect.center = self.position
 
     def release(self, event):
         if self.clicked and event.button == self.mouse_button and self.rect.collidepoint(*pg.mouse.get_pos()):
@@ -286,7 +293,6 @@ class Frame:
         self.surface.fill(background.lerp(black, 0.5))
 
         self.event_handler = EventHandler()
-        self.triggers = []
         self.widgets = []
         self.registered_events = set()
 
@@ -294,13 +300,12 @@ class Frame:
 
     def add_widget(self, w):
         for t in w.triggers:
-            self.triggers.append(t)
             for grp in w.triggers[t]:
                 if grp[0] == 'n':
                     self.event_handler.register(t, grp[1])
                     self.registered_events.add(t)
-                elif type == 'k':
-                    self.event_handler.register_key_event(*tuple(grp[1:]))
+                elif grp[0] == 'k':
+                    self.event_handler.register_key_event(t, *tuple(grp[1:]))
                     self.registered_events.add(pg.KEYDOWN)
                     self.registered_events.add(pg.KEYUP)
 

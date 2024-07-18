@@ -1,6 +1,6 @@
 import pygame as pg
 from math import pi, sin, cos
-from random import randint
+from random import randint, random
 
 pg.init()
 
@@ -32,6 +32,9 @@ pointer_color = pg.Color(0, 0, 0)
 
 white = pg.Color(255, 255, 255)
 black = pg.Color(0, 0, 0)
+transparent = pg.Color(0, 0, 0, 0)
+
+unit = pg.Vector2(1, 1)
 
 laser_width = 3
 shader_steps = 6
