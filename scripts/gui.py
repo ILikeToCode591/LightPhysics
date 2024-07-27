@@ -49,20 +49,152 @@ class Text(Widget):
         self.anchor_self(self.position)
 
     def anchor_self(self, position):
+        self.position = position
+
         if self.anchor == 'c':
             self.rect.center = position
         elif self.anchor == 'tl':
             self.rect.topleft = position
+        elif self.anchor == 'tr':
+            self.rect.topright = position
+        elif self.anchor == 'bl':
+            self.rect.bottomleft = position
+
+
+class TextInput(Widget):
+    def __init__(self, position, width, height = 20, font_size = 35, on_entry = None, allow_letters = True, allow_numbers = True, allow_period = True, label = None, label_color = white):
+        super().__init__(position)
+
+        self.width = width
+        self.height = height
+
+        self.active = False
+
+        self.string = ''
+        self.selected = False
+
+        self.font_size = font_size
+        self.on_entry = on_entry
+        self.period = allow_period
+        self.letter = allow_letters
+        self.number = allow_numbers
+
+        self.t = 0
+
+        self.background = NineSliced(*text_box_img)
+
+        self.image = self.background.create_image(width, height)
+        self.rect = self.image.get_rect()
+
+        self.rect.center = self.position
+        self.label = None
+        if label:
+            self.label = Text(label, label_color, self.rect.topleft, 35, 'bl')
+
+        self.text = Text(self.string, black, pg.Vector2(5, 0), self.font_size, anchor='tl')
+
+        self.triggers[pg.KEYDOWN].append(('n', self.add_to_string))
+        self.triggers[pg.MOUSEBUTTONDOWN].append(('n', self.select))
+        self.triggers[pg.K_RETURN].append(('k', self.enter, None, False))
+        self.triggers[pg.K_BACKSPACE].append(('k', self.backspace, None, True))
+
+    def add_to_string(self, event):
+        if not self.selected: return
+        str = pg.key.name(event.key)
+        if len(str) == 1 and ((str.isalpha() and self.letter) or
+                              (str.isdigit() and self.number) or
+                              str in '_' or
+                              (str in '.' and self.period)):
+            self.string = self.string+str
+        self.text.update_text(text = self.string)
+
+        self.create_image()
+
+    def clear(self):
+        self.string = ''
+        self.text.update_text(text=self.string)
+
+        self.create_image()
+
+    def update_text(self, val):
+        self.string = val
+        self.text.update_text(text = self.string)
+
+        self.create_image()
+
+    def select(self, event):
+        if not self.active:
+            return
+
+        if not self.rect.collidepoint(*pg.mouse.get_pos()):
+            self.selected = False
+        else:
+            self.selected = True
+
+        self.create_image()
+
+    def backspace(self, *args):
+        if not self.selected: return
+        if self.string:
+            self.string = self.string[:-1]
+
+        self.text.update_text(text=self.string)
+
+        self.create_image()
+
+    def deactivate(self):
+        self.active = False
+        self.selected = False
+
+    def activate(self):
+        self.active = True
+
+    def enter(self, *args):
+        if self.on_entry and self.selected:
+            self.on_entry(self.string)
+        self.selected = False
+
+    def create_image(self):
+        self.image = self.background.create_image(self.width, self.height)
+
+        if self.text.rect.width > self.width:
+            self.text.anchor = 'tr'
+            self.text.anchor_self(pg.Vector2(self.width-5, 0))
+        else:
+            self.text.anchor = 'tl'
+            self.text.anchor_self(pg.Vector2(5, 0))
+
+        self.text.render(self.image)
+
+    def render_subclass(self, screen):
+
+        if self.label:
+            self.label.render(screen)
+
+        if not self.selected: return
+
+        self.t += 0.02
+        if self.t == 2:
+            self.t = 0
+        if int(self.t) % 2:
+            pg.draw.rect(screen, black, (
+                *tuple(pg.Vector2(self.rect.topleft) + pg.Vector2(self.text.rect.topright)), 4, self.text.rect.height
+            ))
 
 
 class Button(Widget):
-    def __init__(self, position, width, height, onclick, onrelease = None,  name: str = None, icon: str = None,
-                 mouse_button: int = pg.BUTTON_LEFT):
+    def __init__(self, position, width, height, onclick = None, onrelease = None,  name: str = None, icon: str = None,
+                 mouse_button: int = pg.BUTTON_LEFT, font_size = 30):
 
         super().__init__(position)
 
         self.width = width
         self.height = height
+
+        self.button_slices = NineSliced(*button_img)
+        self.button_active_slices = NineSliced(*button_p_img)
+
+        self.font_size = font_size
 
         self.clicked = False
         self.onclick = onclick
@@ -70,7 +202,9 @@ class Button(Widget):
 
         self.mouse_button = mouse_button
 
-        self.set_image(name, icon)
+        self.name_and_icon = name,icon
+
+        self.set_image(*self.name_and_icon)
 
         self.triggers[pg.MOUSEBUTTONDOWN].append(('n', self.click))
         self.triggers[pg.MOUSEBUTTONUP].append(('n', self.release))
@@ -80,13 +214,16 @@ class Button(Widget):
             self.clicked = True
             if self.onclick:
                 self.onclick()
+            self.set_image(*self.name_and_icon)
 
     def set_image(self, name= None, icon = None):
-        self.image = NineSliced(*button_img).create_image(self.width, self.height)
+        self.image = (self.button_slices if not self.clicked else self.button_active_slices).create_image(
+            self.width, self.height
+        )
         self.rect = self.image.get_rect()
 
         if name:
-            Text(name, black, pg.Vector2(self.width, self.height) / 2, 30).render(self.image)
+            Text(name, black, pg.Vector2(self.width, self.height) / 2, self.font_size).render(self.image)
         if icon:
             img = pg.image.load(get_asset(('texture', 'icon'), *tuple(icon.split('.'))))
             rect = img.get_rect()
@@ -101,6 +238,10 @@ class Button(Widget):
             self.clicked = False
             if self.onrelease:
                 self.onrelease()
+            self.set_image(*self.name_and_icon)
+
+    def __str__(self):
+        return f'Button({self.name_and_icon[0]})'
 
 
 class ImageButton(Button):
@@ -275,8 +416,8 @@ class NineSliced:
                 image.blit(pg.transform.scale(self.parts[part], (
                     horizontal_resize if h % 2 else (self.parts[part].get_width()) * scale,
                     vertical_resize if v % 2 else (self.parts[part].get_height()) * scale)
-                                              ), (horizontals[h], verticals[v], horizontals[h + 1], verticals[v + 1])
-                           )
+                    ), (horizontals[h], verticals[v], horizontals[h + 1], verticals[v + 1])
+                )
                 part += 1
 
         return image

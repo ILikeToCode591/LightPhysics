@@ -35,6 +35,15 @@ class EventHandler:
 
         self.s_key_events[key].append([function_d, function_u])
 
+    def clear_all_events(self):
+        self.events = defaultdict(list)
+        self.s_key_events = defaultdict(list)
+        self.r_key_events = defaultdict(list)
+        self.t_key_events = dict()
+
+        self.t_events = dict()
+        self.active_t_events = []
+
     def broadcast(self, event):
         for funct in self.events.get(event.type, []):
             funct(event)

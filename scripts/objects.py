@@ -53,16 +53,6 @@ class Interactable(Attachable):
         super().__init__(position, rotation)
         if poly_args[0]:
             self.polygon: Polygon = Polygon(position, rotation, *poly_args)
-        self.interacting : list[Laser] = []
-
-    def reset_rays(self):
-        for i in self.interacting:
-            i.reset()
-
-    def interact(self, ray, line: Line, position: pg.Vector2):
-        reflected = ray.reflect(line.get_normal(), position)
-        self.interacting.append(ray)
-        return reflected
 
     def check_interaction(self, sp, ep):
         coll = self.polygon.line_collide(sp, ep)
@@ -73,6 +63,12 @@ class Interactable(Attachable):
 
     def check_selection(self, pos):
         pass
+
+    @staticmethod
+    def interact(ray, line: Line, position: pg.Vector2):
+        reflected = ray.reflect(line.get_normal(), position)
+        reflected.target = None
+        return reflected
 
     @staticmethod
     def check_collision(sp, ep):
@@ -137,6 +133,9 @@ class Laser(Attachable):
             self.raylets[collision[1]] = collision[0].interact(self, collision[1], collision[2] - self.direction*2)
             self.raylets[collision[1]].power = self.power-1
             target = collision[2]
+
+        for r in self.raylets.values():
+            r.raycast()
 
         self.target = target
 
@@ -226,6 +225,10 @@ class LaserGroup(Attachable):
         for i in range(-size + 1, size):
             self.attach(Laser(color, position + i * (laser_width - laser_offset) * self.perpendicular, direction))
 
+    def reset(self):
+        for i in self.attached_objs:
+            i[0].reset()
+
     def rotate_subclass(self, angle):
         self.perpendicular = self.perpendicular.rotate(angle)
         self.direction = self.direction.rotate(angle)
@@ -306,22 +309,18 @@ class PolyMirror(Interactable):
     def increase_size(self):
         self.polygon.increase_size()
         self.align_buttons()
-        self.reset_rays()
 
     def decrease_size(self):
         self.polygon.decrease_size()
         self.align_buttons()
-        self.reset_rays()
 
     def rotate_subclass(self, angle):
         self.align_buttons()
-        self.reset_rays()
 
     def displace_subclass(self, offset):
         for w in self.custom_frame.widgets:
             w.position += offset
             w.rect.center = w.position
-        self.reset_rays()
 
     def check_selection(self, pos):
         return self.polygon.collide_point(pos)
@@ -368,13 +367,15 @@ class PolyMirror(Interactable):
     def deselect_vertex(self):
         self.selected_vertex = None
         self.polygon.update_polygon()
-        self.reset_rays()
 
     def render_mask(self, surf):
         l = self.polygon.vertex_offsets
         for i in range(len(self.polygon.vertex_offsets)):
             v, w = l[i], l[(i + 1) % (len(l))]
             pg.draw.line(surf, white, self.position + v, self.position + w, poly_borderwidth+10)
+
+    def get_arguments(self):
+        return 'pom', ('v', self.position), ('u', self.rotation), ('l[v]', self.polygon.vertex_offsets)
 
     @staticmethod
     def create_object():
@@ -409,17 +410,9 @@ class PlaneMirror(Interactable):
 
     def increase_size(self):
         self.line.increase_size()
-        self.reset_rays()
 
     def decrease_size(self):
         self.line.decrease_size()
-        self.reset_rays()
-
-    def rotate_subclass(self, angle):
-        self.reset_rays()
-
-    def displace_subclass(self, offset):
-        self.reset_rays()
 
     def check_selection(self, pos):
         return self.line.collide_point(pos.x, pos.y)
@@ -434,6 +427,9 @@ class PlaneMirror(Interactable):
             mid + s + s.normalize()*5,
             mid + e + e.normalize()*5,
             mirror_width + 10)
+
+    def get_arguments(self):
+        return 'plm', ('v', self.position), ('u', self.rotation), ('u', self.line.get_length())
 
     @staticmethod
     def create_object():
@@ -468,6 +464,9 @@ class Pointer(Instrument):
         if simulate:
             self.raycast()
 
+    def reset(self):
+        self.laser_grp.reset()
+
     def shader(self, shader_scrn, flags=0):
         self.laser_grp.shader(shader_scrn, flags)
 
@@ -498,9 +497,13 @@ class Pointer(Instrument):
             v, w = l[i], l[(i + 1) % (len(l))]
             pg.draw.line(surf, white, self.position + v, self.position + w, poly_borderwidth + 5)
 
+    def get_arguments(self):
+        return 'ptr', ('v', self.position), ('u', self.rotation), ('u', self.laser_grp.color), ('u', self.laser_grp.size)
+
     @staticmethod
     def create_object():
         return Pointer(pg.Vector2(win_width // 2, win_height // 2), 0, pg.Color(255, 0, 0), 1)
 
 
 Objects = Interactable | Instrument
+Interactives = PolyMirror | PlaneMirror

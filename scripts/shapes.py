@@ -13,13 +13,9 @@ class Line:
         return (self.start_pos - self.end_pos).rotate(90).normalize()
 
     def collide_point(self, x, y):
-        a = (self.start_pos - self.end_pos).magnitude()/2
-        angle = (self.start_pos - self.end_pos).as_polar()[1]
-        return ((
-                (x-self.position.x)*cos(angle) + (y-self.position.y)*sin(angle)
-        )**2/a**2 + (
-                (x-self.position.x)*sin(angle) - (y-self.position.y)*cos(angle)
-        )**2/10**2) < 1
+        pos = pg.Vector2(x, y)
+
+        return (pos - self.start_pos).magnitude() + (pos - self.end_pos).magnitude() - self.get_length() < 1
 
     def increase_size(self, ds=1):
         self.start_pos += (self.start_pos - self.position).normalize() * ds
@@ -27,9 +23,10 @@ class Line:
 
     def decrease_size(self, ds=1):
         if (self.start_pos - self.end_pos).magnitude() - 2*ds <= 10:
-            return
+            return False
         self.start_pos -= (self.start_pos - self.position).normalize() * ds
         self.end_pos -= (self.end_pos - self.position).normalize() * ds
+        return True
 
     def rotate(self, angle):
         self.start_pos = (self.start_pos - self.position).rotate(angle) + self.position
@@ -41,7 +38,7 @@ class Line:
         self.end_pos+=offset
 
     def move_to(self, position):
-        self.displace(position - self.position  )
+        self.displace(position - self.position )
 
     def distance_to(self, point : pg.Vector2):
         return abs((self.start_pos - point).dot(self.get_normal()))
@@ -65,6 +62,9 @@ class Line:
             return pg.Vector2(x1 + t * (x2 - x1),
                                   y1 + t * (y2 - y1))
 
+    def get_length(self):
+        return (self.start_pos - self.end_pos).magnitude()
+
 
 class Polygon(pg.sprite.Sprite):
 
@@ -72,7 +72,7 @@ class Polygon(pg.sprite.Sprite):
         super().__init__(*groups)
 
         self.position = position.copy()
-        self.rotation = 0
+        self.rotation = rotation
         self.vertex_offsets = vertex_offsets
         self.color = pg.Color(*color)
         self.edges: list[Line] = []
@@ -87,7 +87,6 @@ class Polygon(pg.sprite.Sprite):
         self.mask = pg.mask.from_surface(self.image)
 
         self.update_polygon()
-        self.rotate(rotation)
 
     def get_com(self):
         return sum(self.vertex_offsets, start=pg.Vector2())/len(self.vertex_offsets)
@@ -262,3 +261,4 @@ class Rectangle(Polygon):
                  (width // 2, -height // 2)]
 
         super().__init__(position, rotation, [pg.Vector2(off) for off in v_off], color, *groups)
+        self.rotate(rotation)

@@ -1,5 +1,8 @@
 from scripts.screens import *
+from scripts.object_handler import ObjectHandler
+from scripts.save_and_load import InstanceManager
 import sys
+import os
 
 
 class Simulation:
@@ -10,23 +13,54 @@ class Simulation:
         self.clock = pg.time.Clock()
 
         self.running = True
+        self.object_handler = ObjectHandler(self)
+        self.instance_manager = InstanceManager(self)
+
+        self.current_save = None
 
         self.screens = {
-            'test': Test(self),
+            # 'test': Test(self),
             'build': Build(self),
-            'simulation': Simulate(self)
+            'simulation': Simulate(self),
+            'options': Options(self),
+            'saves': Saves(self)
         }
 
         self.__active_screen = 'build'
 
+        self.load_instance(open('saves/last_save.txt').read())
+
+    def save_instance(self, name):
+        self.instance_manager.save_instance(self.object_handler.objects, name)
+
+    def load_instance(self, name):
+
+        self.object_handler.delete_all_objects()
+        if not name:
+            self.save_instance('save')
+            self.load_instance('save')
+            return
+        self.object_handler.objects = self.instance_manager.load_instance(name)
+        self.current_save = name
+
+    @staticmethod
+    def delete_instance(name):
+        os.remove(f'saves/{name}.lpi')
+
     def clear_screen(self):
         self.active_screen.clear()
 
+    def save(self):
+        self.save_instance(self.current_save)
+
     def quit(self, *args):
+        open('saves/last_save.txt', 'w').write(self.current_save)
         self.running = False
 
     def run(self):
-        self.active_screen.start()
+
+        for s in self.screens.values():
+            s.start()
 
         while self.running:
             self.display.fill(background)
@@ -47,11 +81,8 @@ class Simulation:
     def active_screen(self) -> Screen:
         return self.screens[self.__active_screen]
 
-    def set_active_screen(self, name, start = False):
+    def set_active_screen(self, name):
         self.__active_screen = name
-
-        if start:
-            self.active_screen.start()
 
     def __getitem__(self, item):
         return self.screens[item]
