@@ -245,21 +245,16 @@ class Options(Screen):
 
     def start(self):
         self.widget_handler.register_widget(
-            Button(pg.Vector2(win_width//2, win_height//2 - 110),
+            Button(pg.Vector2(win_width//2, win_height//2 - 55),
                    250, 100, self.build, None, name='BACK', font_size=80)
         )
 
         self.widget_handler.register_widget(
-            Button(pg.Vector2(win_width // 2, win_height // 2),
-                   250, 100, self.controls, None, name='CONTROLS', font_size=80)
-        )
-
-        self.widget_handler.register_widget(
-            Button(pg.Vector2(win_width // 2, win_height // 2 + 110),
+            Button(pg.Vector2(win_width // 2, win_height // 2 + 55),
                    250, 100, self.saves, None, name='SAVES', font_size=80)
         )
         self.widget_handler.register_widget(
-            Button(pg.Vector2(win_width // 2 - 125 - 35, win_height // 2 + 110),
+            Button(pg.Vector2(win_width // 2 - 125 - 35, win_height // 2 + 55),
                    60, 60, self.simulator.save, None, icon='floppy.png', font_size=80)
         )
 
