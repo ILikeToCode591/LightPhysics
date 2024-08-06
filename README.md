@@ -38,7 +38,7 @@ To precisely set the position or rotation of the selected objects, type in a val
 
 ## Transforming Objects
 
-To transform an object, select an object and then hold down the transform_object key `default: T` do the following:
+To transform an object, select an object and then hold down the transform_object key `default: T` and do the following:
 * Moving an object <br/>
     Left-click anywhere on the screen and the selected object will be moved to the current position of the mouse pointer.
     Holding down the left-click will make the selected object follow the mouse pointer as it moves.
@@ -51,7 +51,7 @@ To transform an object, select an object and then hold down the transform_object
 
 ## Custom options for objects
 
-To view the custom options for an object, select the object, hold down the custom_object key `default: C', and do the following:
+To view the custom options for an object, select the object, hold down the custom_object key `default: C`, and do the following:
 
 * Pointers <br/>
     A slider will appear on the right side of the screen. Clicking on the slider will select the corresponding color.
